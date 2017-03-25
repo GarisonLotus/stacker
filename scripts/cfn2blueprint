@@ -3,7 +3,6 @@
 
 import argparse
 import json
-import pprint
 
 
 class object_registry(object):
@@ -82,7 +81,6 @@ def do_header(d):
     blueprint.write('    Route53HostedZoneIdList,\n')
     blueprint.write(')\n')
 
-
     # Loop over the resources to find imports
     if 'Resources' in d:
         seen = []
@@ -91,8 +89,9 @@ def do_header(d):
             (mod, tropo_object) = generate_troposphere_object(v['Type'])
             if tropo_object not in seen:
                 seen.append(tropo_object)
-                blueprint.write('from troposphere.%s import %s \n' % (
+                blueprint.write('from troposphere.%s import %s\n' % (
                                 mod, additional_imports(tropo_object)))
+    blueprint.write('from stacker.blueprints.base import Blueprint\n')
     blueprint.write('\n')
     blueprint.write('\n')
 
@@ -102,13 +101,13 @@ def do_classdefinition(d):
     CLASSNAME = CLASSNAME.replace(".", "")
     CLASSNAME = CLASSNAME.replace("/", "")
     blueprint.write('class %s(Blueprint):\n' % (CLASSNAME))
-    blueprint.write('    """ cfn2blueprint generated blueprint converted from '
+    blueprint.write('    """\n    cfn2blueprint generated blueprint converted from '
                     'cloudformation  into a stacker blueprint\n\n    The Class'
                     ' name would be called in your class path in the stacker '
                     'config. In the class are\n    seperate functions that are'
-                    ' added when dectected in your source CFN template."""\n'
+                    ' added when dectected in your source CFN template.\n'
                     '\n\n    Each function is called by the create_template '
-                    'function at the bottem of this blueprint')
+                    'function at the bottem of this blueprint\n    """')
     blueprint.write('\n')
     blueprint.write('\n')
 
@@ -137,18 +136,71 @@ def do_description(d):
 
 
 def do_parameters(d):
-    """Output the template Parameters"""
+
+    params_to_varibles = {
+        "String": "CFNString",
+        "Number": "CFNNumber",
+        "List<Number>": "CFNNumberList",
+        "CommaDelimitedList": "CFNCommaDelimitedList",
+        "AWS::EC2::AvailabilityZone::Name": "EC2AvailabilityZoneName",
+        "AWS::EC2::Image::Id": "EC2ImageId",
+        "AWS::EC2::Instance::Id": "EC2InstanceId",
+        "AWS::EC2::KeyPair::KeyName": "EC2KeyPairKeyName",
+        "AWS::EC2::SecurityGroup::GroupName": "EC2SecurityGroupGroupName",
+        "AWS::EC2::SecurityGroup::Id": "EC2SecurityGroupId",
+        "AWS::EC2::Subnet::Id": "EC2SubnetId",
+        "AWS::EC2::Volume::Id": "EC2VolumeId",
+        "AWS::EC2::VPC::Id": "EC2VPCId",
+        "AWS::Route53::HostedZone::Id": "Route53HostedZoneId",
+        "List<AWS::EC2::AvailabilityZone::Name>": "EC2AvailabilityZoneNameList",
+        "List<AWS::EC2::Image::Id>": "EC2ImageIdList",
+        "List<AWS::EC2::Instance::Id>": "EC2InstanceIdList",
+        "List<AWS::EC2::SecurityGroup::GroupName>": "EC2SecurityGroupGroupNameList",
+        "List<AWS::EC2::SecurityGroup::Id>": "EC2SecurityGroupIdList",
+        "List<AWS::EC2::Subnet::Id>": "EC2SubnetIdList",
+        "List<AWS::EC2::Volume::Id>": "EC2VolumeIdList",
+        "List<AWS::EC2::VPC::Id>": "EC2VPCIdList",
+        "List<AWS::Route53::HostedZone::Id>": "Route53HostedZoneIdList",
+    }
+
+    """Output the template Parameters as stacker Varibles"""
     global PARAMETERSPRESENT
     PARAMETERSPRESENT = 1
     params = d['Parameters']
+    blueprint.write('    VARIABLES = {\n')
     for k, v in params.items():
-        object_name = objects.add(k)
-        blueprint.write('%s = t.add_parameter(Parameter(\n' % (object_name,))
-        blueprint.write('    "%s",\n' % (k, ))
-        for pk, pv in v.items():
-            blueprint.write('    %s=%s,\n' % (pk, output_value(pv)))
-        blueprint.write('))\n')
-        blueprint.write('\n')
+        blueprint.write('        \"%s\": {\n' % (k,))
+        for vk, vv in v.items():
+            if type(vv) is not list:
+                if params_to_varibles.has_key(vv):
+                    m = params_to_varibles[vv]
+                    blueprint.write('            \"type\": \"%s\",\n' % (m))
+            if vk == "Default":
+                blueprint.write('            \"default\": \"%s\",\n' % (vv))
+            if vk == "NoEcho":
+                blueprint.write('            \"no_echo\": \"%s\",\n' % (vv))
+            if vk == "Description":
+                blueprint.write('            \"description\": \"%s\",\n' % (vv))
+            if vk == "AllowedValues":
+                allowed = []
+                for allowedvalue in vv:
+                    allowed.append(str(allowedvalue))
+                blueprint.write('            \"allowed_values\": %s,\n' % (allowed))
+            if vk == "AllowedPattern":
+                blueprint.write('            \"allowed_pattern\": \"%s\",\n' % (vv))
+            if vk == "MaxLength":
+                blueprint.write('            \"max_length\": \"%s\",\n' % (vv))
+            if vk == "MinLength":
+                blueprint.write('            \"min_length\": \"%s\",\n' % (vv))
+            if vk == "MaxValue":
+                blueprint.write('            \"max_value\": \"%s\",\n' % (vv))
+            if vk == "MinValue":
+                blueprint.write('            \"min_value\": \"%s\",\n' % (vv))
+            if vk == "ConstraintDescription":
+                blueprint.write('            \"constraint_description\": \"%s\",\n' % (vv))
+        blueprint.write('        },\n')
+    blueprint.write('    }\n')
+    blueprint.write('\n\n')
 
 
 def do_conditions(d):
@@ -160,7 +212,7 @@ def do_conditions(d):
     conditions = d['Conditions']
     for k, v in conditions.items():
         blueprint.write('        t.add_condition("%s",\n' % (k,))
-        blueprint.write('    %s\n' % output_value(v))
+        blueprint.write('            %s\n' % output_value(v))
         blueprint.write('        )\n')
         blueprint.write('\n')
 
@@ -168,15 +220,19 @@ def do_mappings(d):
     """Output the template Mappings"""
     global MAPPINGSPRESENT
     MAPPINGSPRESENT = 1
+    blueprint.write('    """ Note: Stacker has support for mappings in the')
+    blueprint.write(' yaml config\n    It\'s a good idea to move these')
+    blueprint.write(' there. """\n')
     blueprint.write('    def add_mappings(self):\n')
     blueprint.write('        t = self.template\n')
     mappings = d['Mappings']
     for k, v in mappings.items():
-        blueprint.write('        t.add_mapping("%s",\n' % (k,))
-        pprint.pprint(v)
-        blueprint.write('        )\n')
+        blueprint.write('        t.add_mapping("%s", {\n' % (k,))
+        for vk, vv in v.items():
+            for vvk, vvv in vv.items():
+                blueprint.write('            "%s": {"%s": "%s"},\n' % (vk, vvk, vvv))
+        blueprint.write('        })\n')
         blueprint.write('        \n')
-
 
 def map_module(mod):
     """Map module names as needed"""
@@ -436,6 +492,9 @@ def do_trailer(d):
     if DESCRIPTIONPRESENT == 1:
         blueprint.write('        self.add_cfn_description()\n')
     if MAPPINGSPRESENT == 1:
+        blueprint.write('    """ Note: Stacker has support for mappings in the')
+        blueprint.write(' yaml config\n    It\'s a good idea to move these')
+        blueprint.write(' there. """\n')
         blueprint.write('        self.add_mappings()\n')
     blueprint.write('        self.add_resources()\n')
     if OUTPUTSPRESENT == 1:
@@ -452,14 +511,13 @@ if __name__ == "__main__":
 
     d = json.load(open(args.template))
 
-    print d
 
     blueprint = open(args.blueprint, 'w+')
 
     do_header(d)
     do_classdefinition(d)
     sections = [
-        #'Parameters',
+        'Parameters',
         'Conditions',
         'AWSTemplateFormatVersion',
         'Description',
