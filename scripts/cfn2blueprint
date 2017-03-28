@@ -522,7 +522,12 @@ def output_ref_value(v):
     if type(v) == dict:
         for key, value in v.items():
             if key == "Ref":
-                return "variables[\'" + value + "\'].ref"
+                if value not in PARAMS:
+                    print "key: " + key + " value: " + value
+                    return "Ref(" + value + ")"
+                else:
+                    print "key: " + key + " value: " + value
+                    return "variables[\'" + value + "\'].ref"
             else:
                 return output_value(v)
 
