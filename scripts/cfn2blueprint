@@ -11,13 +11,16 @@ a stacker blueprint.  It converts the JSON exactly as written.
 
 Run like so: cfn2blueprint ./sturdycore.json ./sturdycore.py
 
+The result will be a python template named "sturdycore.py" with a class
+named "sturdycore"
+
 known issues:
-1) troposphere objects are created in the exact order they are
+    1) troposphere objects are created in the exact order they are
 in the JSON. Because of this, they might reference each other before
 assignment. The fix is to move the object being referenced so it gets
 assigned before the reference itself.
-2) varible names that match the name of imported modules need to be manually
-renamed
+    2) varible names that match the name of imported modules need to be
+manually renamed
 
 Templates might not get generated perfectly. We recomend running stacker diff
 or build with interactive mode on the first time to ensure the blueprint was
@@ -151,8 +154,8 @@ def do_awstemplateformatversion(d):
     global AWSTEMPLATEFORMATVERSIONPRESENT
     AWSTEMPLATEFORMATVERSIONPRESENT = 1
     blueprint.write('    def add_cfn_version(self):\n')
-    blueprint.write('        t = self.template\n')
-    blueprint.write('        t.add_version("%s")\n' % (
+    blueprint.write('        template = self.template\n')
+    blueprint.write('        template.add_version("%s")\n' % (
         d['AWSTemplateFormatVersion'], ))
     blueprint.write('\n')
     blueprint.write('\n')
@@ -163,8 +166,8 @@ def do_description(d):
     global DESCRIPTIONPRESENT
     DESCRIPTIONPRESENT = 1
     blueprint.write('    def add_cfn_description(self):\n')
-    blueprint.write('        t = self.template\n')
-    blueprint.write('        t.add_description(\n            "'
+    blueprint.write('        template = self.template\n')
+    blueprint.write('        template.add_description(\n            "'
                     '%s"\n        )\n' % (d['Description'], ))
     blueprint.write('\n')
     blueprint.write('\n')
@@ -253,11 +256,11 @@ def do_conditions(d):
     global CONDITIONSPRESENT
     CONDITIONSPRESENT = 1
     blueprint.write('    def add_conditions(self):\n')
-    blueprint.write('        t = self.template\n')
+    blueprint.write('        template = self.template\n')
     blueprint.write('        variables = self.get_variables()\n')
     conditions = d['Conditions']
     for k, v in conditions.items():
-        blueprint.write('        t.add_condition("%s",\n' % (k,))
+        blueprint.write('        template.add_condition("%s",\n' % (k,))
         blueprint.write('            %s\n' % output_value(v))
         blueprint.write('        )\n')
         blueprint.write('\n')
@@ -270,11 +273,11 @@ def do_mappings(d):
     blueprint.write(' yaml config\n    It\'s a good idea to move these')
     blueprint.write(' there. """\n')
     blueprint.write('    def add_mappings(self):\n')
-    blueprint.write('        t = self.template\n')
+    blueprint.write('        template = self.template\n')
     blueprint.write('        variables = self.get_variables()\n')
     mappings = d['Mappings']
     for k, v in mappings.items():
-        blueprint.write('        t.add_mapping("%s", {\n' % (k,))
+        blueprint.write('        template.add_mapping("%s", {\n' % (k,))
         for vk, vv in v.items():
             for vvk, vvv in vv.items():
                 blueprint.write('            "%s": {"%s": "%s"},\n' % (
@@ -395,7 +398,7 @@ top_level_aliases = {
 def do_resources(d):
     """Output the template Resources"""
     blueprint.write('    def add_resources(self):\n')
-    blueprint.write('        t = self.template\n')
+    blueprint.write('        template = self.template\n')
     blueprint.write('        variables = self.get_variables()\n')
     resources = d['Resources']
     for k, v in resources.items():
@@ -403,7 +406,7 @@ def do_resources(d):
         (_, tropo_object) = generate_troposphere_object(v['Type'])
         if(top_level_aliases.has_key(tropo_object)):
             tropo_object = top_level_aliases[tropo_object]
-        blueprint.write('        %s = t.add_resource(%s(\n' % (
+        blueprint.write('        %s = template.add_resource(%s(\n' % (
                         object_name, tropo_object))
         blueprint.write('            "%s",\n' % (k, ))
         for p in filter(lambda x: v.has_key(x), ['Metadata', 'Properties']):
@@ -556,10 +559,10 @@ def do_outputs(d):
     global OUTPUTSPRESENT
     OUTPUTSPRESENT = 1
     blueprint.write('    def add_outputs(self):\n')
-    blueprint.write('        t = self.template\n')
+    blueprint.write('        template = self.template\n')
     outputs = d['Outputs']
     for k, v in outputs.items():
-        blueprint.write('        %s = t.add_output(Output(\n' % (k,))
+        blueprint.write('        %s = template.add_output(Output(\n' % (k,))
         blueprint.write('            "%s",\n' % (k, ))
         for pk, pv in v.items():
             if isinstance(pv, basestring):
