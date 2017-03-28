@@ -573,9 +573,6 @@ def do_trailer(d):
     if DESCRIPTIONPRESENT == 1:
         blueprint.write('        self.add_cfn_description()\n')
     if MAPPINGSPRESENT == 1:
-        blueprint.write('    """ Note: Stacker supports mappings in it\'s')
-        blueprint.write(' yaml config\n    It\'s a good idea to move these')
-        blueprint.write(' there. """\n')
         blueprint.write('        self.add_mappings()\n')
     blueprint.write('        self.add_resources()\n')
     if OUTPUTSPRESENT == 1:
