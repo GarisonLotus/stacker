@@ -7,14 +7,22 @@ Thanks for everyone who chipped in to cfn2py and troposphere!
 
 
 This script will convert your existing CFN template in JSON to
-a stacker blueprint.
+a stacker blueprint.  It converts the JSON exactly as written.
 
 Run like so: cfn2blueprint ./sturdycore.json ./sturdycore.py
 
+known issues:
+1) troposphere objects are created in the exact order they are
+in the JSON. Because of this, they might reference each other before
+assignment. The fix is to move the object being referenced so it gets
+assigned before the reference itself.
+2) varible names that match the name of imported modules need to be manually
+renamed
 
-
-We recomend running stacker diff or build with interactive mode on the first
-time to ensure the blueprint was corectly generated.
+Templates might not get generated perfectly. We recomend running stacker diff
+or build with interactive mode on the first time to ensure the blueprint was
+corectly generated. Even then, you might need to make changes to your blueprint
+before it will work.
 
 """
 import argparse
@@ -205,7 +213,7 @@ def do_parameters(d):
             if type(vv) is not list:
                 if params_to_varibles.has_key(vv):
                     m = params_to_varibles[vv]
-                    blueprint.write('            \"type\": \"%s\",\n' % (m))
+                    blueprint.write('            \"type\": %s,\n' % (m))
             if vk == "Default":
                 blueprint.write('            \"default\": \"%s\",\n' % (vv))
             if vk == "NoEcho":
@@ -246,6 +254,7 @@ def do_conditions(d):
     CONDITIONSPRESENT = 1
     blueprint.write('    def add_conditions(self):\n')
     blueprint.write('        t = self.template\n')
+    blueprint.write('        variables = self.get_variables()\n')
     conditions = d['Conditions']
     for k, v in conditions.items():
         blueprint.write('        t.add_condition("%s",\n' % (k,))
@@ -262,6 +271,7 @@ def do_mappings(d):
     blueprint.write(' there. """\n')
     blueprint.write('    def add_mappings(self):\n')
     blueprint.write('        t = self.template\n')
+    blueprint.write('        variables = self.get_variables()\n')
     mappings = d['Mappings']
     for k, v in mappings.items():
         blueprint.write('        t.add_mapping("%s", {\n' % (k,))
@@ -386,8 +396,7 @@ def do_resources(d):
     """Output the template Resources"""
     blueprint.write('    def add_resources(self):\n')
     blueprint.write('        t = self.template\n')
-    if PARAMETERSPRESENT == 1:
-        blueprint.write('        variables = self.get_variables()\n')
+    blueprint.write('        variables = self.get_variables()\n')
     resources = d['Resources']
     for k, v in resources.items():
         object_name = objects.add(k)
@@ -434,6 +443,7 @@ def handle_one_object(name, values):
     """Handle intrinsic functions which have a single named resource"""
     ret = name + "("
     if name == "variables":
+        ret = name + "["
         for i, param in enumerate(values):
             if i > 0:
                 ret += ", "
@@ -443,7 +453,7 @@ def handle_one_object(name, values):
             else:
                 ret += output_value(param)
 
-        return ret + ").ref"
+        return ret + "].ref"
     for i, param in enumerate(values):
         if i > 0:
             ret += ", "
