@@ -1,6 +1,15 @@
 #!/usr/bin/env python
+"""
+cfn2blueprint originally sourced, but heavily modified from cfn2py in the
+troposphere repo. commit 933e6565b2a8330dd8100470002c7f3b520bf0d5.
+
+Thanks for everyone who chipped in to cfn2py and troposphere!
 
 
+This script will convert your existing CFN template in JSON to
+a stacker blueprint.
+
+"""
 import argparse
 import json
 
@@ -22,6 +31,10 @@ class object_registry(object):
     OUTPUTSPRESENT = 0
     global PARAMETERSPRESENT
     PARAMETERSPRESENT = 0
+    global PARAMS
+    PARAMS = []
+    """ this above PARAMS global list is used later to determine if a Ref is a
+     Ref to a CFN paramter or if it's a Ref to another Python object """
 
     def __init__(self):
         self.objects = {}
@@ -57,15 +70,19 @@ def additional_imports(o):
     else:
         return o
 
+""" generating the blueprint header """
 def do_header(d):
     """Output a stock header for the new Python script and also try to
     figure out the Resource imports needed by the template.
     """
-    blueprint.write('from troposphere import Base64, Select, FindInMap, GetAtt, GetAZs, Join, Output, If, And, Not, Or, Equals, Condition\n')
+    blueprint.write('from troposphere import (\n')
+    blueprint.write('    Base64, Select, FindInMap, GetAtt, GetAZs, Join,\n')
+    blueprint.write('    Output, If, And, Not, Or, Equals, Condition\n)\n')
     blueprint.write('from troposphere import Parameter, Ref, Tags, Template\n')
     blueprint.write('from troposphere.cloudformation import Init\n')
-    blueprint.write('from troposphere.cloudfront import Distribution, DistributionConfig\n')
-    blueprint.write('from troposphere.cloudfront import Origin, DefaultCacheBehavior\n')
+    blueprint.write('from troposphere.cloudfront import (\n')
+    blueprint.write('    Distribution, DistributionConfig, Origin,\n')
+    blueprint.write('    DefaultCacheBehavior\n)\n')
     blueprint.write('from troposphere.ec2 import PortRange\n')
     blueprint.write('from stacker.blueprints.variables.types import (\n')
     blueprint.write('    CFNString, CFNNumber, CFNNumberList,\n')
@@ -81,7 +98,7 @@ def do_header(d):
     blueprint.write('    Route53HostedZoneIdList,\n')
     blueprint.write(')\n')
 
-    # Loop over the resources to find imports
+    """ Loop over the resources to find imports """
     if 'Resources' in d:
         seen = []
         resources = d['Resources']
@@ -100,15 +117,18 @@ def do_classdefinition(d):
     CLASSNAME = args.blueprint.replace(".py", "")
     CLASSNAME = CLASSNAME.replace(".", "")
     CLASSNAME = CLASSNAME.replace("/", "")
+    CLASSNAME = CLASSNAME.replace("-", "")
     blueprint.write('class %s(Blueprint):\n' % (CLASSNAME))
-    blueprint.write('    """\n    cfn2blueprint generated blueprint converted from '
-                    'cloudformation  into a stacker blueprint\n\n    The Class'
-                    ' name would be called in your class path in the stacker '
-                    'config. In the class are\n    seperate functions that are'
-                    ' added when dectected in your source CFN template.\n'
-                    '\n\n    Each function is called by the create_template '
-                    'function at the bottem of this blueprint\n    """')
-    blueprint.write('\n')
+    blueprint.write('    """\n    cfn2blueprint generated blueprint converted '
+                    'from cloudformation into a stacker blueprint\n\n    The '
+                    'Class name would be called in your class path in the '
+                    'stacker config. In the class itself are\n    functions '
+                    'that are added when dectected in your source CFN '
+                    'template.\n\n\n    Each function is called by the '
+                    'create_template function at the bottem of this ')
+    blueprint.write('blueprint\n\n\n\n    We recomend running stacker diff ')
+    blueprint.write('or build with interactive mode on the first time to \n ')
+    blueprint.write('   ensure the blueprint was corectly generated.    """\n')
     blueprint.write('\n')
 
 def do_awstemplateformatversion(d):
@@ -152,10 +172,12 @@ def do_parameters(d):
         "AWS::EC2::Volume::Id": "EC2VolumeId",
         "AWS::EC2::VPC::Id": "EC2VPCId",
         "AWS::Route53::HostedZone::Id": "Route53HostedZoneId",
-        "List<AWS::EC2::AvailabilityZone::Name>": "EC2AvailabilityZoneNameList",
+        "List<AWS::EC2::AvailabilityZone::Name>":
+            "EC2AvailabilityZoneNameList",
         "List<AWS::EC2::Image::Id>": "EC2ImageIdList",
         "List<AWS::EC2::Instance::Id>": "EC2InstanceIdList",
-        "List<AWS::EC2::SecurityGroup::GroupName>": "EC2SecurityGroupGroupNameList",
+        "List<AWS::EC2::SecurityGroup::GroupName>":
+            "EC2SecurityGroupGroupNameList",
         "List<AWS::EC2::SecurityGroup::Id>": "EC2SecurityGroupIdList",
         "List<AWS::EC2::Subnet::Id>": "EC2SubnetIdList",
         "List<AWS::EC2::Volume::Id>": "EC2VolumeIdList",
@@ -169,6 +191,8 @@ def do_parameters(d):
     params = d['Parameters']
     blueprint.write('    VARIABLES = {\n')
     for k, v in params.items():
+        global PARAMS
+        PARAMS.append(k)
         blueprint.write('        \"%s\": {\n' % (k,))
         for vk, vv in v.items():
             if type(vv) is not list:
@@ -180,14 +204,17 @@ def do_parameters(d):
             if vk == "NoEcho":
                 blueprint.write('            \"no_echo\": \"%s\",\n' % (vv))
             if vk == "Description":
-                blueprint.write('            \"description\": \"%s\",\n' % (vv))
+                blueprint.write('            \"description\": \"%s\",\n' % (
+                            vv))
             if vk == "AllowedValues":
                 allowed = []
                 for allowedvalue in vv:
                     allowed.append(str(allowedvalue))
-                blueprint.write('            \"allowed_values\": %s,\n' % (allowed))
+                blueprint.write('            \"allowed_values\": %s,\n' % (
+                    allowed))
             if vk == "AllowedPattern":
-                blueprint.write('            \"allowed_pattern\": \"%s\",\n' % (vv))
+                blueprint.write('            \"allowed_pattern\": \"%s\",\n' %
+                                (vv))
             if vk == "MaxLength":
                 blueprint.write('            \"max_length\": \"%s\",\n' % (vv))
             if vk == "MinLength":
@@ -197,7 +224,8 @@ def do_parameters(d):
             if vk == "MinValue":
                 blueprint.write('            \"min_value\": \"%s\",\n' % (vv))
             if vk == "ConstraintDescription":
-                blueprint.write('            \"constraint_description\": \"%s\",\n' % (vv))
+                blueprint.write('            \"constraint_description\":')
+                blueprint.write(' \"%s\",\n' % (vv))
         blueprint.write('        },\n')
     blueprint.write('    }\n')
     blueprint.write('\n\n')
@@ -230,7 +258,8 @@ def do_mappings(d):
         blueprint.write('        t.add_mapping("%s", {\n' % (k,))
         for vk, vv in v.items():
             for vvk, vvv in vv.items():
-                blueprint.write('            "%s": {"%s": "%s"},\n' % (vk, vvk, vvv))
+                blueprint.write('            "%s": {"%s": "%s"},\n' % (
+                        vk, vvk, vvv))
         blueprint.write('        })\n')
         blueprint.write('        \n')
 
@@ -372,10 +401,8 @@ def do_resources(d):
                         pk, pk, output_dict(pv)))
                 elif known_functions.has_key(pk):
                     do_resources_content(pk, pv, p)
-                # Below is processing of strings
                 elif isinstance(pv, basestring):
                     blueprint.write('            %s="%s",\n' % (pk, pv))
-                # Below is processing of refs
                 else:
                     blueprint.write('          %s=%s,\n' % (
                         pk, output_ref_value(pv)))
@@ -397,10 +424,21 @@ def handle_no_objects(name, values):
 def handle_one_object(name, values):
     """Handle intrinsic functions which have a single named resource"""
     ret = name + "("
+    if name == "variables":
+        for i, param in enumerate(values):
+            if i > 0:
+                ret += ", "
+            """ First parameter might be an object name or pseudo parameter """
+            if i == 0:
+                ret += objects.lookup(param)
+            else:
+                ret += output_value(param)
+
+        return ret + ").ref"
     for i, param in enumerate(values):
         if i > 0:
             ret += ", "
-        # First parameter might be an object name or pseudo parameter
+        """ First parameter might be an object name or pseudo parameter """
         if i == 0:
             ret += objects.lookup(param)
         else:
@@ -420,32 +458,63 @@ function_map = {
     'Fn::GetAZs': ("GetAZs", handle_no_objects),
     'Fn::Join': ("Join", handle_no_objects),
     'Fn::Select': ("Select", handle_one_object),
-    'Ref': ("Ref", handle_one_object),
+    'Ref': ("variables", handle_one_object),
+    'pseudoparameter': ("Ref", handle_one_object),
+    'tropo_object': ("Ref", handle_one_object),
     'Condition': ("Condition", handle_one_object),
 }
+
+pseudoparameter_map = [
+    'AWS::AccountId',
+    'AWS::NotificationARNs',
+    'AWS::NoValue',
+    'AWS::StackId',
+    'AWS::Region',
+    'AWS::StackName',
+]
 
 
 def output_value(v):
     """Output a value which may be a string or a set of function calls."""
     if isinstance(v, basestring):
-        return '"%s"' % (v.replace('\\', '\\\\').replace('\n', '\\n').replace("\"", "\\\""))
+        return '"%s"' % (v.replace('\\', '\\\\').replace(
+            '\n', '\\n').replace("\"", "\\\""))
     elif isinstance(v, bool):
         return '%s' % (str(v))
     elif isinstance(v, int):
         return '%d' % (v)
     elif isinstance(v, list):
         return "[" + ", ".join(map(output_value, v)) + "]"
+    else:
+        pass
 
     out = []
-    # Should only be one of these...
+    """ Should only be one of these...
+     checking if pseudoparameter and non CFN parameters, leaving Ref alone """
     for fk, fv in v.items():
-        if fk in function_map:
+        if fv in pseudoparameter_map:
+            fk = "pseudoparameter"
             (shortname, handler) = function_map[fk]
             if not isinstance(fv, list):
                 fv = [fv]
             return handler(shortname, fv)
+        elif isinstance(fv, unicode):
+            if fv not in PARAMS:
+                fk = "tropo_object"
+                (shortname, handler) = function_map[fk]
+                if not isinstance(fv, list):
+                    fv = [fv]
+                return handler(shortname, fv)
+            elif fk in function_map:
+                (shortname, handler) = function_map[fk]
+                if not isinstance(fv, list):
+                    fv = [fv]
+                return handler(shortname, fv)
+            else:
+                out.append( '"' + fk + '": ' + output_value(fv))
         else:
             out.append( '"' + fk + '": ' + output_value(fv))
+
     return "{ " + ", ".join(out) + " }"
 
 def output_ref_value(v):
@@ -492,7 +561,7 @@ def do_trailer(d):
     if DESCRIPTIONPRESENT == 1:
         blueprint.write('        self.add_cfn_description()\n')
     if MAPPINGSPRESENT == 1:
-        blueprint.write('    """ Note: Stacker has support for mappings in the')
+        blueprint.write('    """ Note: Stacker supports mappings in it\'s')
         blueprint.write(' yaml config\n    It\'s a good idea to move these')
         blueprint.write(' there. """\n')
         blueprint.write('        self.add_mappings()\n')
@@ -505,12 +574,11 @@ def do_trailer(d):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("template", help="json template to convert")
-    parser.add_argument("blueprint", help="blueprint output to create. Used "
+    parser.add_argument("blueprint", help="blueprint .py file to create. Used "
                         "for file name and class name in the blueprint")
     args = parser.parse_args()
 
     d = json.load(open(args.template))
-
 
     blueprint = open(args.blueprint, 'w+')
 
