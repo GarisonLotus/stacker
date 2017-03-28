@@ -1,13 +1,20 @@
 #!/usr/bin/env python
 """
-cfn2blueprint originally sourced, but heavily modified from cfn2py in the
-troposphere repo. commit 933e6565b2a8330dd8100470002c7f3b520bf0d5.
+This cfn2blueprint script originally sourced, but heavily modified from cfn2py
+in the troposphere repo from commit 933e6565b2a8330dd8100470002c7f3b520bf0d5.
 
 Thanks for everyone who chipped in to cfn2py and troposphere!
 
 
 This script will convert your existing CFN template in JSON to
 a stacker blueprint.
+
+Run like so: cfn2blueprint ./sturdycore.json ./sturdycore.py
+
+
+
+We recomend running stacker diff or build with interactive mode on the first
+time to ensure the blueprint was corectly generated.
 
 """
 import argparse
@@ -226,6 +233,8 @@ def do_parameters(d):
             if vk == "ConstraintDescription":
                 blueprint.write('            \"constraint_description\":')
                 blueprint.write(' \"%s\",\n' % (vv))
+            else:
+                pass
         blueprint.write('        },\n')
     blueprint.write('    }\n')
     blueprint.write('\n\n')
@@ -313,7 +322,7 @@ function_quirks = {
     "Subscription":       [ "Subscription" ],
     "LoginProfile":       { "LoginProfile": ["Password"] },
     "AWS::CloudFormation::Init": {"Init": []},
-    "PrivateIpAddresses" : ["PrivateIpAddressSpecification"],
+    "PrivateIpAddresses": ["PrivateIpAddressSpecification"],
     "ContainerDefinitions": ["ContainerDefinition"],
 }
 
@@ -498,7 +507,7 @@ def output_value(v):
             if not isinstance(fv, list):
                 fv = [fv]
             return handler(shortname, fv)
-        elif isinstance(fv, unicode):
+        elif isinstance(fv, unicode) and fk == "Ref":
             if fv not in PARAMS:
                 fk = "tropo_object"
                 (shortname, handler) = function_map[fk]
@@ -523,10 +532,8 @@ def output_ref_value(v):
         for key, value in v.items():
             if key == "Ref":
                 if value not in PARAMS:
-                    print "key: " + key + " value: " + value
                     return "Ref(" + value + ")"
                 else:
-                    print "key: " + key + " value: " + value
                     return "variables[\'" + value + "\'].ref"
             else:
                 return output_value(v)
