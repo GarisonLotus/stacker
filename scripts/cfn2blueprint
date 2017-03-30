@@ -3,29 +3,38 @@
 This cfn2blueprint script originally sourced, but heavily modified from cfn2py
 in the troposphere repo from commit 933e6565b2a8330dd8100470002c7f3b520bf0d5.
 
-Thanks for everyone who chipped in to cfn2py and troposphere!
+This script will attempt to convert your existing CFN JSON template to
+a stacker blueprint. It converts the JSON exactly as written and is intended
+to give you a starting point allowing you to use stacker with existing stacks.
+The idea is that you would have a resulting blueprint that matches your
+existing stack exactly when you execute a stacker build against the stack
+with the new blueprint. This script is not perfect and you will most likely
+have to still modify your blueprint to get it to work. This does not generate
+a stacker config, only the blueprint itself. See the Known issues
+section below.
 
-
-This script will convert your existing CFN template in JSON to
-a stacker blueprint.  It converts the JSON exactly as written.
-
-Run like so: cfn2blueprint ./sturdycore.json ./sturdycore.py
+Usage example: cfn2blueprint ./sturdycore.json ./sturdycore.py
 
 The result will be a python template named "sturdycore.py" with a class
 named "sturdycore"
 
-known issues:
+Known issues:
     1) troposphere objects are created in the exact order they are
-in the JSON. Because of this, they might reference each other before
-assignment. The fix is to move the object being referenced so it gets
-assigned before the reference itself.
-    2) varible names that match the name of imported modules need to be
-manually renamed
+in the JSON. Because of this, Ref statements referencing Python Objects might
+be placed in the blueprint before assignment. The fix is to move the object
+being referenced so it gets assigned before the reference itself.
+    2) IAM Roles can get generated incorrectly. If you find your IAM role
+not being generated correctly, we recommend importing the awacs module, and use
+awacs to generate objects instead. Visit https://github.com/cloudtools/awacs
+for more information on that.
 
-Templates might not get generated perfectly. We recomend running stacker diff
-or build with interactive mode on the first time to ensure the blueprint was
-corectly generated. Even then, you might need to make changes to your blueprint
-before it will work.
+
+
+Templates might not get generated perfectly. When you are ready to try against
+running stacks, we heavily recommend running stacker build with interactive
+mode on the first time to find problems in your blueprint. Even then, you will
+most likely need to make changes to your blueprint before it will work.
+
 
 """
 import argparse
