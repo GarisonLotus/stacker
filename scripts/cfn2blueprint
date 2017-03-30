@@ -558,7 +558,7 @@ def do_outputs(d):
     """Output the template Outputs"""
     outputs = d['Outputs']
     for k, v in outputs.items():
-        blueprint.write('        %s = template.add_output(Output(\n' % (k,))
+        blueprint.write('        template.add_output(Output(\n')
         blueprint.write('            "%s",\n' % (k, ))
         for pk, pv in v.items():
             if isinstance(pv, basestring):
