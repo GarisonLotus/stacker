@@ -556,10 +556,6 @@ def output_ref_value(v):
 
 def do_outputs(d):
     """Output the template Outputs"""
-    global OUTPUTSPRESENT
-    OUTPUTSPRESENT = 1
-    blueprint.write('    def add_outputs(self):\n')
-    blueprint.write('        template = self.template\n')
     outputs = d['Outputs']
     for k, v in outputs.items():
         blueprint.write('        %s = template.add_output(Output(\n' % (k,))
@@ -588,8 +584,6 @@ def do_trailer(d):
     if MAPPINGSPRESENT == 1:
         blueprint.write('        self.add_mappings()\n')
     blueprint.write('        self.add_resources()\n')
-    if OUTPUTSPRESENT == 1:
-        blueprint.write('        self.add_outputs()\n')
 
 
 
