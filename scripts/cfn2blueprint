@@ -27,6 +27,9 @@ being referenced so it gets assigned before the reference itself.
 not being generated correctly, we recommend importing the awacs module, and use
 awacs to generate objects instead. Visit https://github.com/cloudtools/awacs
 for more information on that.
+    3) Resources with the same name as an imported module need to be changed
+manually as well as all Ref("name") references to that resource
+
 
 
 
@@ -46,18 +49,6 @@ class object_registry(object):
     in order to map back to due to use in intrinsic functions like
     Ref() and GetAtt().
     """
-    global CONDITIONSPRESENT
-    CONDITIONSPRESENT = 0
-    global AWSTEMPLATEFORMATVERSIONPRESENT
-    AWSTEMPLATEFORMATVERSIONPRESENT = 0
-    global DESCRIPTIONPRESENT
-    DESCRIPTIONPRESENT = 0
-    global MAPPINGSPRESENT
-    MAPPINGSPRESENT = 0
-    global OUTPUTSPRESENT
-    OUTPUTSPRESENT = 0
-    global PARAMETERSPRESENT
-    PARAMETERSPRESENT = 0
     global PARAMS
     PARAMS = []
     """ this above PARAMS global list is used later to determine if a Ref is a
@@ -159,8 +150,6 @@ def do_classdefinition(d):
 
 def do_awstemplateformatversion(d):
     """Output the template version"""
-    global AWSTEMPLATEFORMATVERSIONPRESENT
-    AWSTEMPLATEFORMATVERSIONPRESENT = 1
     blueprint.write('    def add_cfn_version(self):\n')
     blueprint.write('        template = self.template\n')
     blueprint.write('        template.add_version("%s")\n' % (
@@ -170,8 +159,6 @@ def do_awstemplateformatversion(d):
 
 def do_description(d):
     """Output the template Description"""
-    global DESCRIPTIONPRESENT
-    DESCRIPTIONPRESENT = 1
     blueprint.write('    def add_cfn_description(self):\n')
     blueprint.write('        template = self.template\n')
     blueprint.write('        template.add_description(\n            "'
@@ -210,8 +197,6 @@ def do_parameters(d):
     }
 
     """Output the template Parameters as stacker Varibles"""
-    global PARAMETERSPRESENT
-    PARAMETERSPRESENT = 1
     params = d['Parameters']
     blueprint.write('    VARIABLES = {\n')
     for k, v in params.items():
@@ -226,7 +211,7 @@ def do_parameters(d):
             if vk == "Default":
                 blueprint.write('            \"default\": \"%s\",\n' % (vv))
             if vk == "NoEcho":
-                blueprint.write('            \"no_echo\": \"%s\",\n' % (vv))
+                blueprint.write('            \"no_echo\": %s,\n' % (vv))
             if vk == "Description":
                 blueprint.write('            \"description\": \"%s\",\n' % (
                             vv))
@@ -259,8 +244,6 @@ def do_parameters(d):
 
 def do_conditions(d):
     """Output the template Conditions"""
-    global CONDITIONSPRESENT
-    CONDITIONSPRESENT = 1
     blueprint.write('    def add_conditions(self):\n')
     blueprint.write('        template = self.template\n')
     blueprint.write('        variables = self.get_variables()\n')
@@ -273,8 +256,6 @@ def do_conditions(d):
 
 def do_mappings(d):
     """Output the template Mappings"""
-    global MAPPINGSPRESENT
-    MAPPINGSPRESENT = 1
     blueprint.write('    """ Note: Stacker has support for mappings in the')
     blueprint.write(' yaml config\n    It\'s a good idea to move these')
     blueprint.write(' there. """\n')
@@ -585,13 +566,13 @@ def do_trailer(d):
     blueprint.write('    """ Below function is what is called by the '
                     'stacker build action """\n')
     blueprint.write('    def create_template(self):\n')
-    if CONDITIONSPRESENT == 1:
+    if 'Conditions' in d.keys():
         blueprint.write('        self.add_conditions()\n')
-    if AWSTEMPLATEFORMATVERSIONPRESENT == 1:
+    if 'AWSTemplateFormatVersion' in d.keys():
         blueprint.write('        self.add_cfn_version()\n')
-    if DESCRIPTIONPRESENT == 1:
+    if 'Description' in d.keys():
         blueprint.write('        self.add_cfn_description()\n')
-    if MAPPINGSPRESENT == 1:
+    if 'Mappings' in d.keys():
         blueprint.write('        self.add_mappings()\n')
     blueprint.write('        self.add_resources()\n')
 
