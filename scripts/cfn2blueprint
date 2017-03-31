@@ -539,6 +539,11 @@ def output_value(v):
                 return handler(shortname, fv)
             else:
                 out.append( '"' + fk + '": ' + output_value(fv))
+        elif fk in function_map:
+            (shortname, handler) = function_map[fk]
+            if not isinstance(fv, list):
+                fv = [fv]
+            return handler(shortname, fv)
         else:
             out.append( '"' + fk + '": ' + output_value(fv))
 
@@ -558,6 +563,7 @@ def output_ref_value(v):
 
     else:
         return output_value(v)
+
 
 def do_outputs(d):
     """Output the template Outputs"""
@@ -588,7 +594,6 @@ def do_trailer(d):
     if MAPPINGSPRESENT == 1:
         blueprint.write('        self.add_mappings()\n')
     blueprint.write('        self.add_resources()\n')
-
 
 
 if __name__ == "__main__":
